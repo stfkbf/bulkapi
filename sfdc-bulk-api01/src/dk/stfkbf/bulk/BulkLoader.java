@@ -1,4 +1,4 @@
-package uk.gov.fsa;
+package dk.stfkbf.bulk;
 
 public class BulkLoader {
 
