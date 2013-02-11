@@ -1,6 +1,9 @@
 package dk.stfkbf.bulk;
 
 import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.SocketAddress;
 import java.util.*;
 
 import com.sforce.async.*;
@@ -13,6 +16,7 @@ public class BulkLoader {
 	public static void main(String[] args) throws AsyncApiException,
 			ConnectionException, IOException {
 		BulkLoader loader = new BulkLoader();
+		
 		// Replace arguments below with your credentials and test file name
 		// The first parameter indicates that we are loading Account records
 		loader.runSample("Account", "FRN__c", args[0], args[1], args[2]);
@@ -37,8 +41,15 @@ public class BulkLoader {
 		ConnectorConfig enterpriseConfig = new ConnectorConfig();
 		enterpriseConfig.setUsername(userName);
 		enterpriseConfig.setPassword(password);
-		enterpriseConfig
-				.setAuthEndpoint("https://login.salesforce.com/services/Soap/c/27.0");
+		enterpriseConfig.setAuthEndpoint("https://login.salesforce.com/services/Soap/c/27.0");
+		
+		if (System.getProperty("http.proxyHost") != null && 
+			System.getProperty("http.proxyPort") != null) {		
+			SocketAddress addr = new InetSocketAddress(System.getProperty("http.proxyHost"), new Integer(System.getProperty("http.proxyPort")));
+			Proxy proxy = new Proxy(Proxy.Type.HTTP, addr);
+			enterpriseConfig.setProxy(proxy);		
+		}
+		
 		// Creating the connection automatically handles login and stores
 		// the session in partnerConfig
 		new EnterpriseConnection(enterpriseConfig);
@@ -47,7 +58,15 @@ public class BulkLoader {
 		// a valid session is stored in the ConnectorConfig instance.
 		// Use this key to initialize a BulkConnection:
 		ConnectorConfig config = new ConnectorConfig();
-		config.setSessionId(enterpriseConfig.getSessionId());
+		
+		if (System.getProperty("http.proxyHost") != null && 
+			System.getProperty("http.proxyPort") != null) {		
+			SocketAddress addr = new InetSocketAddress(System.getProperty("http.proxyHost"), new Integer(System.getProperty("http.proxyPort")));
+			Proxy proxy = new Proxy(Proxy.Type.HTTP, addr);
+			config.setProxy(proxy);		
+		}
+		
+		config.setSessionId(enterpriseConfig.getSessionId());		
 		// The endpoint for the Bulk API service is the same as for the normal
 		// SOAP uri until the /Soap/ part. From here it's '/async/versionNumber'
 		String soapEndpoint = enterpriseConfig.getServiceEndpoint();
@@ -60,6 +79,7 @@ public class BulkLoader {
 		config.setCompression(true);
 		// Set this to true to see HTTP requests and responses on stdout
 		config.setTraceMessage(false);
+					
 		BulkConnection connection = new BulkConnection(config);
 		return connection;
 	}
