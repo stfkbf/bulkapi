@@ -13,14 +13,27 @@ import com.sforce.ws.ConnectorConfig;
 
 public class BulkLoader {
 
+	// Probably shouldn't be static ...
+	private static String fileType = "SFDC";
+	
 	public static void main(String[] args) throws AsyncApiException,
 			ConnectionException, IOException {
 		BulkLoader loader = new BulkLoader();
 		
 		// Replace arguments below with your credentials and test file name
 		// The first parameter indicates that we are loading Account records
-		loader.runSample("Account", "FRN__c", args[0], args[1], args[2]);
-		loader.runSample("Permission__c", "Permission_Id__c", args[0], args[1], args[3]);
+		fileType = args[2];
+		
+		if (!fileType.equals("NATIVE") && !fileType.equals("SFDC")){
+			System.out.println("<username> <password> <SFDC|NATIVE> <firm file> <permission file>\n");
+			return;
+		}
+		
+		loader.runSample("Account", "FRN__c", args[0], args[1], args[3]);
+		
+		if (fileType == "SFDC"){
+			loader.runSample("Permission__c", "Permission_Id__c", args[0], args[1], args[4]);
+		}
 	}
 
 	public void runSample(String sobjectType, String externalId, String userName, String password,
@@ -106,6 +119,25 @@ public class BulkLoader {
 		return job;
 	}
 
+	private byte[] transform(byte[] input) throws IOException{
+		// 122702|Barclays Bank Plc|4|1|X|One Churchill Place||||London||E14|5HP|44|020|7116 1000||||Authorised|20011201|20011201|BARCLAYSBANKPLC|20120324|
+		// FRN__c,AccountNumber,Name,BillingStreet,BillingPostalCode,BillingCity,BillingCountry,Firm_Status__c
+		String inputString = new String(input);
+		String[] inputArray = inputString.split("\\|");
+		
+		String output = inputArray[0] + "," + 
+						inputArray[0] + "," + 
+						inputArray[1] + "," + 
+						inputArray[5] + "," + 
+						inputArray[11] + " " + 
+						inputArray[12] + "," + 
+						inputArray[9] + "," + 
+						"United Kingdom" + "," + 
+						inputArray[19] + "\n";
+		
+		return output.getBytes("UTF-8");
+	}
+	
     /**
      * Create and upload batches using a CSV file.
      * The file into the appropriate size batch files.
@@ -128,6 +160,12 @@ public class BulkLoader {
 		int headerBytesLength = headerBytes.length;
 		File tmpFile = File.createTempFile("bulkAPIInsert", ".csv");
 
+		//Replace header if NATIVE
+		if (fileType.equals("NATIVE")){
+			headerBytes = "FRN__c,AccountNumber,Name,BillingStreet,BillingPostalCode,BillingCity,BillingCountry,Firm_Status__c\n".getBytes("UTF-8");
+			headerBytesLength = headerBytes.length;
+		}
+		
 		// Split the CSV file into multiple batches
 		try {
 			FileOutputStream tmpOut = new FileOutputStream(tmpFile);
@@ -138,6 +176,9 @@ public class BulkLoader {
 			String nextLine;
 			while ((nextLine = rdr.readLine()) != null) {
 				byte[] bytes = (nextLine + "\n").getBytes("UTF-8");
+				if (fileType.equals("NATIVE")) {
+					bytes = transform(bytes);
+				}
 				// Create a new batch when our batch size limit is reached
 				if (currentBytes + bytes.length > maxBytesPerBatch
 						|| currentLines > maxRowsPerBatch) {
